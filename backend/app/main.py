@@ -1,15 +1,25 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.database import Base, engine
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    """Initialize database tables on startup, with graceful fallback."""
+    try:
+        from app.database import Base, get_engine
+        engine = get_engine()
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created successfully")
+    except Exception as exc:
+        logger.error("Failed to initialize database: %s", exc)
+        logger.warning("App will start without database — some endpoints may fail")
     yield
 
 
