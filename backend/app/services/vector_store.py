@@ -9,6 +9,16 @@ _COLLECTION = "codepilot"
 _DIM = 384
 
 
+def _faiss_dist_to_score(dist: float) -> float:
+    """Convert L2 distance to a [0, 1] similarity score.
+
+    Uses the formula 1/(1+dist) so that dist=0 → score=1.0 and
+    score decreases monotonically.  Note this is NOT comparable to
+    Qdrant's cosine similarity, but is internally consistent.
+    """
+    return 1.0 / (1.0 + dist)
+
+
 class VectorStore:
     """Abstraction over Qdrant (preferred) with FAISS in-memory fallback."""
 
@@ -255,7 +265,7 @@ class VectorStore:
                     continue
                 if language and meta["language"] != language:
                     continue
-                results.append({**meta, "score": float(1.0 / (1.0 + dist))})
+                results.append({**meta, "score": _faiss_dist_to_score(dist)})
                 if len(results) >= top_k:
                     break
             return results

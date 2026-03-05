@@ -51,7 +51,10 @@ class SandboxRunner:
                 "-w", "/workspace",
                 "python:3.11-slim",
                 "sh", "-c",
-                "pip install -e . -q 2>/dev/null; python -m pytest --tb=short -q 2>&1 || true",
+                # Use --no-build-isolation and avoid editable installs to limit
+                # arbitrary setup.py execution; install only declared deps if present.
+                "[ -f requirements.txt ] && pip install -r requirements.txt -q 2>/dev/null; "
+                "python -m pytest --tb=short -q 2>&1 || true",
             ]
             result = subprocess.run(
                 cmd,

@@ -17,6 +17,9 @@ class SecretsScanner:
         "jwt": r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}",
         "connection_string": r"(?:postgresql|mysql|mongodb|redis)://[^\s\"']+",
     }
+    # Entropy threshold: 4.5 bits/char is well above natural-language text (~3.5)
+    # but typical of Base64-encoded keys, tokens, and high-randomness secrets.
+    # Min length of 20 chars avoids false positives on short identifiers.
     _ENTROPY_THRESHOLD = 4.5
     _ENTROPY_MIN_LEN = 20
 

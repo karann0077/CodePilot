@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 _SLIDING_WINDOW_SIZE = 200
 _SLIDING_WINDOW_OVERLAP = 50
 _LARGE_FILE_THRESHOLD = 1000
+# Average ~1.3 BPE tokens per whitespace-delimited word for typical source code
+_TOKEN_MULTIPLIER = 1.3
 
 
 def chunk_file(
@@ -51,7 +53,9 @@ def chunk_file(
             header = f"# File: {file_path} (lines {start_line + 1}-{end_line})\n"
             text = header + text
 
-        tokens = int(len(text.split()) * 1.3)
+        # 1.3x multiplier accounts for subword tokenisation overhead
+        # (avg ~1.3 BPE tokens per whitespace-delimited word for code)
+        tokens = int(len(text.split()) * _TOKEN_MULTIPLIER)
 
         chunk = Chunk(
             file_id=file_id,

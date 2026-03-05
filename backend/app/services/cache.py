@@ -82,7 +82,7 @@ class LRUCache:
         """Create a cache key from repo_id and prompt."""
         normalized = re.sub(r"\s+", " ", prompt.strip().lower())
         raw = repo_id + "|" + normalized
-        return hashlib.sha256(raw.encode()).hexdigest()[:16]
+        return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
     def stats(self) -> dict:
         total = self._hits + self._misses

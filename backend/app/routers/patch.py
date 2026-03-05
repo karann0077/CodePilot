@@ -13,6 +13,11 @@ from app.services.patch_engine import get_patch_engine
 
 logger = logging.getLogger(__name__)
 
+# Confidence scoring weights
+_VALID_DIFF_BASE = 0.5   # base score when diff passes validation
+_INVALID_DIFF_BASE = 0.1  # base score when diff is malformed
+_RETRIEVAL_SCORE_WEIGHT = 0.5  # contribution of avg retrieval score to confidence
+
 router = APIRouter(prefix="/patch", tags=["patch"])
 
 
@@ -77,7 +82,10 @@ async def propose_patch(
     avg_score = (
         sum(c["score"] for c in chunks) / len(chunks) if chunks else 0.0
     )
-    confidence = round(min(1.0, (0.5 if is_valid else 0.1) + avg_score * 0.5), 3)
+    confidence = round(
+        min(1.0, (_VALID_DIFF_BASE if is_valid else _INVALID_DIFF_BASE) + avg_score * _RETRIEVAL_SCORE_WEIGHT),
+        3,
+    )
 
     return PatchResponse(
         patch_id=str(uuid4()),

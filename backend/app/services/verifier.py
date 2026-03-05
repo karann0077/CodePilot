@@ -7,15 +7,15 @@ logger = logging.getLogger(__name__)
 class Verifier:
     """Scores a sandbox result to estimate patch confidence."""
 
-    _RISK_PATTERNS = [
-        "eval(",
-        "exec(",
-        "os.system(",
-        "password=",
-        "credentials",
-        "subprocess.call(",
-        "__import__(",
-        "compile(",
+    _RISK_PATTERNS: list[tuple[str, re.Pattern]] = [
+        ("eval(", re.compile(r"\beval\s*\(", re.IGNORECASE)),
+        ("exec(", re.compile(r"\bexec\s*\(", re.IGNORECASE)),
+        ("os.system(", re.compile(r"\bos\.system\s*\(", re.IGNORECASE)),
+        ("password=", re.compile(r"\bpassword\s*=", re.IGNORECASE)),
+        ("credentials", re.compile(r"\bcredentials\b", re.IGNORECASE)),
+        ("subprocess.call(", re.compile(r"\bsubprocess\.(?:call|Popen|run)\s*\(", re.IGNORECASE)),
+        ("__import__(", re.compile(r"\b__import__\s*\(", re.IGNORECASE)),
+        ("compile(", re.compile(r"\bcompile\s*\(", re.IGNORECASE)),
     ]
 
     def score(self, sandbox_result: dict, repo_path: str = "") -> dict:
@@ -118,7 +118,7 @@ class Verifier:
 
     def _risk_penalty(self, output: str) -> int:
         """Deduct 20 points per risky pattern found in output, floor at 0."""
-        hits = sum(1 for pattern in self._RISK_PATTERNS if pattern in output)
+        hits = sum(1 for _, regex in self._RISK_PATTERNS if regex.search(output))
         return max(0, 100 - hits * 20)
 
 
