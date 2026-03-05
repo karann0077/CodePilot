@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listRepos, connectRepo, deleteRepo, startIndex } from '../api/client'
-
-interface Repo { id: string; name: string; git_url: string; default_branch: string; created_at: string }
+import { listRepos, connectRepo, deleteRepo, startIndex, type Repo } from '../api/client'
 
 export default function Dashboard() {
   const [repos, setRepos] = useState<Repo[]>([])
@@ -11,7 +9,7 @@ export default function Dashboard() {
   const [error, setError] = useState('')
 
   const fetchRepos = async () => {
-    try { const r = await listRepos(); setRepos(r.data) } catch { setError('Failed to load repos') } finally { setLoading(false) }
+    try { const repos = await listRepos(); setRepos(repos) } catch { setError('Failed to load repos') } finally { setLoading(false) }
   }
 
   useEffect(() => { fetchRepos() }, [])
