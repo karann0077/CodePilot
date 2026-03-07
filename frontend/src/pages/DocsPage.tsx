@@ -13,7 +13,7 @@ export default function DocsPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    listRepos().then(setRepos).catch(() => setError('Failed to load repositories'))
+    listRepos().then(setRepos).catch((e: any) => setError(e?.response?.data?.detail || 'Failed to load repositories'))
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [])
 

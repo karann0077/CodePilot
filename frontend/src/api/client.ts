@@ -2,9 +2,17 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
-  timeout: 30000,
+  timeout: 120000,
   headers: { 'Content-Type': 'application/json' },
 })
+
+api.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('[API Error]', error?.config?.url, error?.response?.status, error?.response?.data)
+    return Promise.reject(error)
+  }
+)
 
 export interface Repo {
   id: string; name: string; git_url: string; default_branch: string;
