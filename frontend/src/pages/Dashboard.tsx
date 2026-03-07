@@ -9,9 +9,19 @@ export default function Dashboard() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [connecting, setConnecting] = useState(false)
+  const [repoLoadError, setRepoLoadError] = useState('')
 
   const fetchRepos = async () => {
-    try { const repos = await listRepos(); setRepos(repos) } catch (e) { setError(getErrorMessage(e)) } finally { setLoading(false) }
+    setRepoLoadError('')
+    setLoading(true)
+    try {
+      const repos = await listRepos()
+      setRepos(repos)
+    } catch (e) {
+      setRepoLoadError(getErrorMessage(e))
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { fetchRepos() }, [])
@@ -63,6 +73,11 @@ export default function Dashboard() {
 
       {loading ? (
         <div className="text-slate-400">Loading...</div>
+      ) : repoLoadError ? (
+        <div className="text-center py-16">
+          <p className="text-red-400 text-sm mb-3">{repoLoadError}</p>
+          <button onClick={fetchRepos} className="text-indigo-400 hover:underline text-sm">Retry</button>
+        </div>
       ) : repos.length === 0 ? (
         <div className="text-center py-16 text-slate-500">
           <div className="text-4xl mb-3">📦</div>

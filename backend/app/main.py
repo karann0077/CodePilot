@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,11 +8,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database tables on startup, with graceful fallback."""
+    settings = get_settings()
+    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    logger.info("CORS allowed origins: %s", origins)
     try:
         from app.database import Base, get_engine
         engine = get_engine()
@@ -60,8 +65,8 @@ try:
     app.include_router(patch.router, prefix="/api")
     app.include_router(sandbox.router, prefix="/api")
     app.include_router(docs.router, prefix="/api")
-except ImportError:
-    pass
+except ImportError as e:
+    logger.warning("Failed to import some routers: %s", e)
 
 
 # ---------------------------------------------------------------------------

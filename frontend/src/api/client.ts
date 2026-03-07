@@ -1,7 +1,15 @@
 import axios from 'axios'
 
+// In production (Vercel), always use '/api' so Vercel's rewrite proxy in
+// vercel.json forwards requests server-side to the Render backend, completely
+// avoiding CORS issues. In development (`npm run dev`), fall back to
+// VITE_API_URL if set (e.g. http://localhost:8000/api).
+const baseURL = import.meta.env.DEV
+  ? (import.meta.env.VITE_API_URL || '/api')
+  : '/api'
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL,
   timeout: 120000,
   headers: { 'Content-Type': 'application/json' },
 })
