@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listRepos, diagnose, type Repo, type DiagnoseResult } from '../api/client'
+import { listRepos, diagnose, getErrorMessage, type Repo, type DiagnoseResult } from '../api/client'
 
 export default function DiagnosePage() {
   const [repos, setRepos] = useState<Repo[]>([])
@@ -10,9 +10,14 @@ export default function DiagnosePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    listRepos().then(setRepos).catch((e: any) => setError(e?.response?.data?.detail || 'Failed to load repositories'))
-  }, [])
+  const [repoLoadError, setRepoLoadError] = useState('')
+
+  const loadRepos = () => {
+    setRepoLoadError('')
+    listRepos().then(setRepos).catch((e) => setRepoLoadError(getErrorMessage(e)))
+  }
+
+  useEffect(() => { loadRepos() }, [])
 
   const handleSubmit = async () => {
     if (!repoId || !errorText.trim()) return
@@ -22,8 +27,8 @@ export default function DiagnosePage() {
     try {
       const res = await diagnose({ repo_id: repoId, error_text: errorText, stacktrace })
       setResult(res)
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Diagnosis failed. Please try again.')
+    } catch (e) {
+      setError(getErrorMessage(e))
     } finally {
       setLoading(false)
     }
@@ -39,6 +44,12 @@ export default function DiagnosePage() {
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 mb-6 space-y-4">
         <div>
           <label className="block text-xs font-medium text-slate-400 mb-1">Repository</label>
+          {repoLoadError ? (
+            <div className="flex items-center gap-3">
+              <span className="text-red-400 text-xs">{repoLoadError}</span>
+              <button onClick={loadRepos} aria-label="Retry loading repositories" className="text-xs text-indigo-400 hover:underline">Retry</button>
+            </div>
+          ) : (
           <select
             value={repoId}
             onChange={e => setRepoId(e.target.value)}
@@ -47,6 +58,7 @@ export default function DiagnosePage() {
             <option value="">Select a repository…</option>
             {repos.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
+          )}
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-400 mb-1">Error Message</label>

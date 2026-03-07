@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listRepos, connectRepo, deleteRepo, startIndex, type Repo } from '../api/client'
+import { listRepos, connectRepo, deleteRepo, startIndex, getErrorMessage, type Repo } from '../api/client'
 
 export default function Dashboard() {
   const [repos, setRepos] = useState<Repo[]>([])
@@ -11,7 +11,7 @@ export default function Dashboard() {
   const [connecting, setConnecting] = useState(false)
 
   const fetchRepos = async () => {
-    try { const repos = await listRepos(); setRepos(repos) } catch (e: any) { setError(e?.response?.data?.detail || 'Failed to load repos') } finally { setLoading(false) }
+    try { const repos = await listRepos(); setRepos(repos) } catch (e) { setError(getErrorMessage(e)) } finally { setLoading(false) }
   }
 
   useEffect(() => { fetchRepos() }, [])
@@ -30,8 +30,8 @@ export default function Dashboard() {
       setForm({ name: '', git_url: '', default_branch: 'main' })
       setSuccess(`Repository "${form.name}" connected successfully!`)
       fetchRepos()
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Failed to connect repo')
+    } catch (e) {
+      setError(getErrorMessage(e))
     } finally {
       setConnecting(false)
     }

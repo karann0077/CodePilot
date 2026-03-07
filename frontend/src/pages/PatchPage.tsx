@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listRepos, proposePatch, type Repo, type PatchResult } from '../api/client'
+import { listRepos, proposePatch, getErrorMessage, type Repo, type PatchResult } from '../api/client'
 import DiffViewer from '../components/DiffViewer'
 import CodeBlock from '../components/CodeBlock'
 
@@ -12,9 +12,14 @@ export default function PatchPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    listRepos().then(setRepos).catch((e: any) => setError(e?.response?.data?.detail || 'Failed to load repositories'))
-  }, [])
+  const [repoLoadError, setRepoLoadError] = useState('')
+
+  const loadRepos = () => {
+    setRepoLoadError('')
+    listRepos().then(setRepos).catch((e) => setRepoLoadError(getErrorMessage(e)))
+  }
+
+  useEffect(() => { loadRepos() }, [])
 
   const handleSubmit = async () => {
     if (!repoId || !issueDescription.trim()) return
@@ -28,8 +33,8 @@ export default function PatchPage() {
         file_path: filePath.trim() || undefined,
       })
       setResult(res)
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Patch generation failed. Please try again.')
+    } catch (e) {
+      setError(getErrorMessage(e))
     } finally {
       setLoading(false)
     }
@@ -48,6 +53,12 @@ export default function PatchPage() {
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 mb-6 space-y-4">
         <div>
           <label className="block text-xs font-medium text-slate-400 mb-1">Repository</label>
+          {repoLoadError ? (
+            <div className="flex items-center gap-3">
+              <span className="text-red-400 text-xs">{repoLoadError}</span>
+              <button onClick={loadRepos} aria-label="Retry loading repositories" className="text-xs text-indigo-400 hover:underline">Retry</button>
+            </div>
+          ) : (
           <select
             value={repoId}
             onChange={e => setRepoId(e.target.value)}
@@ -56,6 +67,7 @@ export default function PatchPage() {
             <option value="">Select a repository…</option>
             {repos.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
+          )}
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-400 mb-1">Issue Description</label>

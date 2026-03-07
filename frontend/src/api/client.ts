@@ -14,6 +14,23 @@ api.interceptors.response.use(
   }
 )
 
+/**
+ * Extracts a human-readable error message from an Axios error.
+ * Distinguishes between CORS/network errors, server errors, and unexpected errors.
+ */
+export function getErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    if (error.response) {
+      const detail = error.response.data?.detail || error.response.data?.message
+      if (detail) return String(detail)
+      return `Server error (${error.response.status})`
+    } else if (error.request) {
+      return 'Network error — the backend server is unreachable. If you are using a hosted frontend, verify that the backend CORS configuration includes this domain.'
+    }
+  }
+  return 'An unexpected error occurred'
+}
+
 export interface Repo {
   id: string; name: string; git_url: string; default_branch: string;
   status: string; file_count?: number; chunk_count?: number; created_at?: string;

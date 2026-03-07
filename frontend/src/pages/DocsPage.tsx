@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { listRepos, generateDocs, getDocResult, type Repo, type DocEntry } from '../api/client'
+import { listRepos, generateDocs, getDocResult, getErrorMessage, type Repo, type DocEntry } from '../api/client'
 import CodeBlock from '../components/CodeBlock'
 
 export default function DocsPage() {
@@ -12,8 +12,15 @@ export default function DocsPage() {
   const [statusMsg, setStatusMsg] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  const [repoLoadError, setRepoLoadError] = useState('')
+
+  const loadRepos = () => {
+    setRepoLoadError('')
+    listRepos().then(setRepos).catch((e) => setRepoLoadError(getErrorMessage(e)))
+  }
+
   useEffect(() => {
-    listRepos().then(setRepos).catch((e: any) => setError(e?.response?.data?.detail || 'Failed to load repositories'))
+    loadRepos()
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [])
 
@@ -49,8 +56,8 @@ export default function DocsPage() {
           setStatusMsg('')
         }
       }, 2000)
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Failed to start documentation generation.')
+    } catch (e) {
+      setError(getErrorMessage(e))
       setLoading(false)
       setStatusMsg('')
     }
@@ -66,6 +73,12 @@ export default function DocsPage() {
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 mb-6 space-y-4">
         <div>
           <label className="block text-xs font-medium text-slate-400 mb-1">Repository</label>
+          {repoLoadError ? (
+            <div className="flex items-center gap-3">
+              <span className="text-red-400 text-xs">{repoLoadError}</span>
+              <button onClick={loadRepos} aria-label="Retry loading repositories" className="text-xs text-indigo-400 hover:underline">Retry</button>
+            </div>
+          ) : (
           <select
             value={repoId}
             onChange={e => setRepoId(e.target.value)}
@@ -74,6 +87,7 @@ export default function DocsPage() {
             <option value="">Select a repository…</option>
             {repos.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
+          )}
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-400 mb-1">File Path <span className="text-slate-500">(optional — leave blank for entire repo)</span></label>
