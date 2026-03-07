@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listRepos, proposePatch, getErrorMessage, type Repo, type PatchResult } from '../api/client'
+import { listRepos, proposePatch, type Repo, type PatchResult } from '../api/client'
 import DiffViewer from '../components/DiffViewer'
 import CodeBlock from '../components/CodeBlock'
 
@@ -16,7 +16,7 @@ export default function PatchPage() {
 
   const loadRepos = () => {
     setRepoLoadError('')
-    listRepos().then(setRepos).catch((e) => setRepoLoadError(getErrorMessage(e)))
+    listRepos().then(setRepos).catch((e: any) => setRepoLoadError(e?.userMessage || 'Failed to load repositories'))
   }
 
   useEffect(() => { loadRepos() }, [])
@@ -34,7 +34,7 @@ export default function PatchPage() {
       })
       setResult(res)
     } catch (e) {
-      setError(getErrorMessage(e))
+      setError((e as any)?.userMessage || 'An unexpected error occurred')
     } finally {
       setLoading(false)
     }
