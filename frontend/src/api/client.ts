@@ -1,12 +1,8 @@
 import axios from 'axios'
 
-// In production (Vercel), always use '/api' so Vercel's rewrite proxy in
-// vercel.json forwards requests server-side to the Render backend, completely
-// avoiding CORS issues. In development (`npm run dev`), fall back to
-// VITE_API_URL if set (e.g. http://localhost:8000/api).
-const baseURL = import.meta.env.DEV
-  ? (import.meta.env.VITE_API_URL || '/api')
-  : '/api'
+const rawBase = import.meta.env.VITE_API_URL || '/api'
+// normalize trailing slash
+const baseURL = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase
 
 const api = axios.create({
   baseURL,
@@ -17,27 +13,25 @@ const api = axios.create({
 api.interceptors.response.use(
   response => response,
   error => {
+    // Synthesize a human-friendly error message for the UI
+    let message = 'Network error — the backend server is unreachable.'
+    if (error && error.response) {
+      // Backend returned a response
+      const data = error.response.data || {}
+      message = data.detail || data.message || `Request failed with status ${error.response.status}`
+    } else if (error && error.request) {
+      // Request was sent but no response received
+      message = 'No response from backend — this may be a network or CORS issue.'
+    } else if (error && error.message) {
+      message = error.message
+    }
+
+    // Attach user-friendly message for pages to use
+    error.userMessage = message
     console.error('[API Error]', error?.config?.url, error?.response?.status, error?.response?.data)
     return Promise.reject(error)
   }
 )
-
-/**
- * Extracts a human-readable error message from an Axios error.
- * Distinguishes between CORS/network errors, server errors, and unexpected errors.
- */
-export function getErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    if (error.response) {
-      const detail = error.response.data?.detail || error.response.data?.message
-      if (detail) return String(detail)
-      return `Server error (${error.response.status})`
-    } else if (error.request) {
-      return 'Network error — the backend server is unreachable. If you are using a hosted frontend, verify that the backend CORS configuration includes this domain.'
-    }
-  }
-  return 'An unexpected error occurred'
-}
 
 export interface Repo {
   id: string; name: string; git_url: string; default_branch: string;
@@ -60,10 +54,7 @@ export interface DocGenResult { job_id: string; status: string; doc_count?: numb
 
 export const connectRepo = (data: { name: string; git_url: string; default_branch?: string }) =>
   api.post<Repo>('/repos/connect', data).then(r => r.data)
-// Backend registers list endpoint at `/api/repos/` (trailing slash).
-// Calling `/repos` can trigger a redirect on some deployments, which may
-// break when a hosting proxy rewrites `/api/*` to an external origin.
-export const listRepos = () => api.get<Repo[]>('/repos/').then(r => r.data)
+export const listRepos = () => api.get<Repo[]>('/repos').then(r => r.data)
 export const deleteRepo = (id: string) => api.delete(`/repos/${id}`).then(r => r.data)
 export const startIndex = (repo_id: string) => api.post<IndexJob>('/index/start', { repo_id }).then(r => r.data)
 export const getIndexStatus = (job_id: string) => api.get<IndexJob>(`/index/status/${job_id}`).then(r => r.data)
