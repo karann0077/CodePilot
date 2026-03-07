@@ -39,7 +39,7 @@ class LLMOrchestrator:
                 logger.debug("Cache hit for key %s", cache_key)
                 return cached
 
-        if mode == "gemini_only":
+        if self._config.llm_mode.strip().lower() == "gemini_only":
             result = await self._call_gemini(prompt, system)
         else:
             result = await self._try_ollama(prompt, system)

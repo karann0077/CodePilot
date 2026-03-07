@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listRepos, diagnose, getErrorMessage, type Repo, type DiagnoseResult } from '../api/client'
+import { listRepos, diagnose, type Repo, type DiagnoseResult } from '../api/client'
 
 export default function DiagnosePage() {
   const [repos, setRepos] = useState<Repo[]>([])
@@ -14,7 +14,7 @@ export default function DiagnosePage() {
 
   const loadRepos = () => {
     setRepoLoadError('')
-    listRepos().then(setRepos).catch((e) => setRepoLoadError(getErrorMessage(e)))
+    listRepos().then(setRepos).catch((e: any) => setRepoLoadError(e?.userMessage || 'Failed to load repositories'))
   }
 
   useEffect(() => { loadRepos() }, [])
@@ -28,7 +28,7 @@ export default function DiagnosePage() {
       const res = await diagnose({ repo_id: repoId, error_text: errorText, stacktrace })
       setResult(res)
     } catch (e) {
-      setError(getErrorMessage(e))
+      setError((e as any)?.userMessage || 'An unexpected error occurred')
     } finally {
       setLoading(false)
     }

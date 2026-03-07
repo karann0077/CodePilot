@@ -17,7 +17,9 @@ const api = axios.create({
 api.interceptors.response.use(
   response => response,
   error => {
+    const userMessage = getErrorMessage(error)
     console.error('[API Error]', error?.config?.url, error?.response?.status, error?.response?.data)
+    error.userMessage = userMessage
     return Promise.reject(error)
   }
 )

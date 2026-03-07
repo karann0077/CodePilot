@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { listRepos, generateDocs, getDocResult, getErrorMessage, type Repo, type DocEntry } from '../api/client'
+import { listRepos, generateDocs, getDocResult, type Repo, type DocEntry } from '../api/client'
 import CodeBlock from '../components/CodeBlock'
 
 export default function DocsPage() {
@@ -16,7 +16,7 @@ export default function DocsPage() {
 
   const loadRepos = () => {
     setRepoLoadError('')
-    listRepos().then(setRepos).catch((e) => setRepoLoadError(getErrorMessage(e)))
+    listRepos().then(setRepos).catch((e: any) => setRepoLoadError(e?.userMessage || 'Failed to load repositories'))
   }
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export default function DocsPage() {
         }
       }, 2000)
     } catch (e) {
-      setError(getErrorMessage(e))
+      setError((e as any)?.userMessage || 'An unexpected error occurred')
       setLoading(false)
       setStatusMsg('')
     }
