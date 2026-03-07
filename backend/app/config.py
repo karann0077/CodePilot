@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     qdrant_port: int = 6333
     llm_mode: str = "hybrid"  # hybrid | gemini_only | openrouter_only
     openrouter_api_key: str = ""
-    openrouter_model: str = "anthropic/claude-3.5-sonnet"
+    openrouter_model: str = "meta-llama/llama-3.1-8b-instruct:free"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "codellama:7b"
     gemini_api_key: str = ""

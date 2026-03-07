@@ -1,5 +1,6 @@
 import logging
-import re
+
+import httpx
 
 from app.config import Settings, get_settings
 from app.services.cache import get_cache
@@ -72,8 +73,6 @@ class LLMOrchestrator:
     async def _try_ollama(self, prompt: str, system: str) -> str | None:
         """Attempt to call the local Ollama instance. Returns None on failure."""
         try:
-            import httpx
-
             full_prompt = f"{system}\n\n{prompt}" if system else prompt
             url = f"{self._config.ollama_base_url}/api/generate"
             payload = {
@@ -132,9 +131,19 @@ class LLMOrchestrator:
             return f"Error: LLM unavailable ({exc})"
 
     async def _call_openrouter(self, prompt: str, system: str) -> str:
-        """Call OpenRouter API. Raises on failure."""
+        """Call OpenRouter API with model fallback and detailed error surfacing."""
         try:
-            import httpx
+            if not self._config.openrouter_api_key:
+                raise ValueError("OPENROUTER_API_KEY is not configured")
+
+            configured_model = self._config.openrouter_model.strip()
+            model_candidates = [
+                configured_model,
+                "meta-llama/llama-3.1-8b-instruct:free",
+                "mistralai/mistral-7b-instruct:free",
+                "google/gemma-2-9b-it:free",
+            ]
+            model_candidates = list(dict.fromkeys([m for m in model_candidates if m]))
 
             url = "https://openrouter.ai/api/v1/chat/completions"
             messages = []
@@ -148,15 +157,29 @@ class LLMOrchestrator:
                 "HTTP-Referer": "https://codepilot.app",   # required by OpenRouter
                 "X-Title": "CodePilot",                    # required by OpenRouter
             }
-            payload = {
-                "model": self._config.openrouter_model,
-                "messages": messages,
-            }
+
             async with httpx.AsyncClient(timeout=90.0) as client:
-                response = await client.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                data = response.json()
-                return data["choices"][0]["message"]["content"]
+                last_exc: Exception | None = None
+                for model in model_candidates:
+                    payload = {"model": model, "messages": messages}
+                    try:
+                        response = await client.post(url, json=payload, headers=headers)
+                        response.raise_for_status()
+                        data = response.json()
+                        return data["choices"][0]["message"]["content"]
+                    except httpx.HTTPStatusError as exc:
+                        body = exc.response.text[:300]
+                        last_exc = RuntimeError(
+                            f"OpenRouter error for model '{model}' (status {exc.response.status_code}): {body}"
+                        )
+                        if exc.response.status_code == 404:
+                            logger.warning("OpenRouter model unavailable, retrying next candidate: %s", model)
+                            continue
+                        raise last_exc
+
+                if last_exc is not None:
+                    raise last_exc
+                raise ValueError("No OpenRouter model candidates configured")
         except Exception as exc:
             logger.error("OpenRouter call failed: %s", exc)
             return f"Error: LLM unavailable ({exc})"
