@@ -39,12 +39,27 @@ class LLMOrchestrator:
                 logger.debug("Cache hit for key %s", cache_key)
                 return cached
 
-        if self._config.llm_mode.strip().lower() == "gemini_only":
+        if mode == "gemini_only":
             result = await self._call_gemini(prompt, system)
+        elif mode == "openrouter_only":
+            result = await self._call_openrouter(prompt, system)
         else:
+            # hybrid: Ollama -> OpenRouter -> Gemini (final fallback)
             result = await self._try_ollama(prompt, system)
             if result is None:
-                result = await self._call_openrouter(prompt, system)
+                if self._config.openrouter_api_key:
+                    result = await self._call_openrouter(prompt, system)
+                    if result and result.startswith("Error: LLM unavailable") and self._config.gemini_api_key:
+                        logger.info("OpenRouter failed, falling back to Gemini")
+                        result = await self._call_gemini(prompt, system)
+                elif self._config.gemini_api_key:
+                    logger.info("No OpenRouter key, trying Gemini fallback")
+                    result = await self._call_gemini(prompt, system)
+                else:
+                    result = (
+                        "Error: LLM unavailable - no provider configured. "
+                        "Set GEMINI_API_KEY with LLM_MODE=gemini_only, or OPENROUTER_API_KEY."
+                    )
 
         scanner = get_secrets_scanner()
         result = scanner.redact(result)
