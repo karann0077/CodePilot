@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listRepos, connectRepo, deleteRepo, startIndex, getErrorMessage, type Repo } from '../api/client'
+import { listRepos, connectRepo, deleteRepo, startIndex, type Repo } from '../api/client'
 
 export default function Dashboard() {
   const [repos, setRepos] = useState<Repo[]>([])
@@ -7,18 +7,15 @@ export default function Dashboard() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ name: '', git_url: '', default_branch: 'main' })
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [connecting, setConnecting] = useState(false)
-  const [repoLoadError, setRepoLoadError] = useState('')
 
   const fetchRepos = async () => {
-    setRepoLoadError('')
     setLoading(true)
+    setError('')
     try {
       const repos = await listRepos()
       setRepos(repos)
-    } catch (e) {
-      setRepoLoadError(getErrorMessage(e))
+    } catch (e: any) {
+      setError(e?.userMessage || e?.response?.data?.detail || 'Failed to load repositories — check backend and CORS settings')
     } finally {
       setLoading(false)
     }
@@ -27,33 +24,23 @@ export default function Dashboard() {
   useEffect(() => { fetchRepos() }, [])
 
   const handleConnect = async () => {
-    if (!form.git_url.match(/^(https?:\/\/|git@)/)) {
-      setError('Git URL must start with https://, http://, or git@')
-      return
-    }
-    setConnecting(true)
-    setError('')
-    setSuccess('')
     try {
       await connectRepo(form)
       setShowModal(false)
       setForm({ name: '', git_url: '', default_branch: 'main' })
-      setSuccess(`Repository "${form.name}" connected successfully!`)
       fetchRepos()
-    } catch (e) {
-      setError(getErrorMessage(e))
-    } finally {
-      setConnecting(false)
+    } catch (e: any) {
+      setError(e?.userMessage || e?.response?.data?.detail || 'Failed to connect repo')
     }
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this repo?')) return
-    await deleteRepo(id); fetchRepos()
+    try { await deleteRepo(id); fetchRepos() } catch (e: any) { setError(e?.userMessage || 'Failed to delete repo') }
   }
 
   const handleIndex = async (id: string) => {
-    await startIndex(id); alert('Indexing started!')
+    try { await startIndex(id); alert('Indexing started!') } catch (e: any) { setError(e?.userMessage || 'Failed to start index') }
   }
 
   return (
@@ -63,21 +50,15 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-white">CodePilot</h1>
           <p className="text-slate-400 text-sm">AI Code Companion</p>
         </div>
-        <button onClick={() => { setShowModal(true); setError(''); setSuccess('') }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        <button onClick={() => setShowModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
           + Connect Repo
         </button>
       </div>
 
       {error && <div className="bg-red-900/40 border border-red-700 text-red-300 px-4 py-2 rounded mb-4 text-sm">{error}</div>}
-      {success && <div className="bg-green-900/40 border border-green-700 text-green-300 px-4 py-2 rounded mb-4 text-sm">{success}</div>}
 
       {loading ? (
-        <div className="text-slate-400">Loading...</div>
-      ) : repoLoadError ? (
-        <div className="text-center py-16">
-          <p className="text-red-400 text-sm mb-3">{repoLoadError}</p>
-          <button onClick={fetchRepos} className="text-indigo-400 hover:underline text-sm">Retry</button>
-        </div>
+        <div className="text-slate-400">Loading repositories…</div>
       ) : repos.length === 0 ? (
         <div className="text-center py-16 text-slate-500">
           <div className="text-4xl mb-3">📦</div>
@@ -115,16 +96,9 @@ export default function Dashboard() {
               <input placeholder="Default branch (main)" value={form.default_branch} onChange={e => setForm({...form, default_branch: e.target.value})}
                 className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
             </div>
-            {error && <div className="bg-red-900/40 border border-red-700 text-red-300 px-4 py-2 rounded mt-3 text-sm">{error}</div>}
             <div className="flex gap-3 mt-5 justify-end">
-              <button onClick={() => { setShowModal(false); setError('') }} className="text-sm text-slate-400 hover:text-white px-4 py-2">Cancel</button>
-              <button
-                onClick={handleConnect}
-                disabled={connecting || !form.name.trim() || !form.git_url.trim()}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-medium"
-              >
-                {connecting ? 'Connecting…' : 'Connect'}
-              </button>
+              <button onClick={() => setShowModal(false)} className="text-sm text-slate-400 hover:text-white px-4 py-2">Cancel</button>
+              <button onClick={handleConnect} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-medium">Connect</button>
             </div>
           </div>
         </div>
