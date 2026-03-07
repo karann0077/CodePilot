@@ -23,6 +23,9 @@ class RepoResponse(BaseModel):
     local_path: Optional[str] = None
     default_branch: str
     created_at: datetime
+    status: str = "connected"
+    file_count: int = 0
+    chunk_count: int = 0
 
 
 # ---------------------------------------------------------------------------
