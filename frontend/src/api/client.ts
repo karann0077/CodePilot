@@ -60,7 +60,10 @@ export interface DocGenResult { job_id: string; status: string; doc_count?: numb
 
 export const connectRepo = (data: { name: string; git_url: string; default_branch?: string }) =>
   api.post<Repo>('/repos/connect', data).then(r => r.data)
-export const listRepos = () => api.get<Repo[]>('/repos').then(r => r.data)
+// Backend registers list endpoint at `/api/repos/` (trailing slash).
+// Calling `/repos` can trigger a redirect on some deployments, which may
+// break when a hosting proxy rewrites `/api/*` to an external origin.
+export const listRepos = () => api.get<Repo[]>('/repos/').then(r => r.data)
 export const deleteRepo = (id: string) => api.delete(`/repos/${id}`).then(r => r.data)
 export const startIndex = (repo_id: string) => api.post<IndexJob>('/index/start', { repo_id }).then(r => r.data)
 export const getIndexStatus = (job_id: string) => api.get<IndexJob>(`/index/status/${job_id}`).then(r => r.data)
