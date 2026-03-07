@@ -11,7 +11,7 @@ export default function QueryPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    listRepos().then(setRepos).catch(() => setError('Failed to load repositories'))
+    listRepos().then(setRepos).catch((e: any) => setError(e?.response?.data?.detail || 'Failed to load repositories'))
   }, [])
 
   const handleSubmit = async () => {
