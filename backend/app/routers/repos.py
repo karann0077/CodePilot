@@ -36,6 +36,7 @@ def connect_repo(body: RepoConnect, db: Session = Depends(get_db)) -> RepoRespon
     return RepoResponse.model_validate(repo)
 
 
+@router.get("", response_model=list[RepoResponse], include_in_schema=False)
 @router.get("/", response_model=list[RepoResponse])
 def list_repos(db: Session = Depends(get_db)) -> list[RepoResponse]:
     """List all registered repositories."""
