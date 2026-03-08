@@ -40,13 +40,7 @@ async def diagnose(
         return DiagnoseResponse(suspects=[])
 
     orchestrator = get_orchestrator()
-    system = (
-        "You are a debugging assistant. Analyse the provided error and code snippets. "
-        "For each suspect code location output a line in this exact format:\n"
-        "SUSPECT: <file_path>:<start_line>-<end_line> PROBABILITY:<0.0-1.0> REASON:<brief explanation>\n"
-        "List the most likely suspects first."
-    )
-    _, user_prompt = orchestrator.assemble_prompt(chunks, combined_query, task="diagnose")
+    system, user_prompt = orchestrator.assemble_prompt(chunks, combined_query, task="diagnose")
 
     try:
         answer = await orchestrator.generate(

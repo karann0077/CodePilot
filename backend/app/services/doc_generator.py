@@ -4,6 +4,7 @@ import re
 from sqlalchemy.orm import Session
 
 from app.models import Chunk, File
+from app.services.prompt_manager import get_prompt_manager
 
 logger = logging.getLogger(__name__)
 
@@ -50,17 +51,10 @@ class DocGenerator:
                 continue
 
             chunk_language = lang or "unknown"
-            prompt = (
-                f"Generate a docstring, example usage, and complexity notes "
-                f"for this {chunk_language} code:\n\n{text}"
-            )
-            system = (
-                "You are a documentation expert. "
-                "Provide concise, accurate documentation. "
-                "Format your response as:\n"
-                "Docstring: <docstring>\n"
-                "Example:\n```\n<usage example>\n```\n"
-                "Complexity: <complexity notes>"
+            system, prompt = get_prompt_manager().render(
+                "docs",
+                language=chunk_language,
+                code=text,
             )
 
             try:
@@ -95,34 +89,72 @@ class DocGenerator:
         """
         Parse LLM response into (docstring, example, complexity).
 
-        Handles both structured and free-form responses.
+        Handles both structured and markdown-heavy responses.
         """
-        docstring = ""
-        example = ""
-        complexity = ""
 
-        # Try structured format first
-        doc_match = re.search(r"Docstring:\s*(.*?)(?=Example:|Complexity:|$)", response, re.DOTALL | re.IGNORECASE)
-        if doc_match:
-            docstring = doc_match.group(1).strip()
+        def _extract_section(text: str, labels: list[str], stop_labels: list[str]) -> str:
+            label_pattern = "|".join(re.escape(label) for label in labels)
+            stop_pattern = "|".join(re.escape(label) for label in stop_labels)
 
-        ex_match = re.search(r"Example:\s*```(?:\w+)?\n?(.*?)```", response, re.DOTALL | re.IGNORECASE)
-        if not ex_match:
-            ex_match = re.search(r"Example:\s*(.*?)(?=Complexity:|$)", response, re.DOTALL | re.IGNORECASE)
-        if ex_match:
-            example = ex_match.group(1).strip()
+            start_re = re.compile(
+                rf"(?:^|\n)\s*(?:[#>*-]\s*)?(?:\*\*)?(?:{label_pattern})(?:\*\*)?\s*:?\s*",
+                re.IGNORECASE,
+            )
+            start_match = start_re.search(text)
+            if not start_match:
+                return ""
 
-        comp_match = re.search(r"Complexity:\s*(.*?)$", response, re.DOTALL | re.IGNORECASE)
-        if comp_match:
-            complexity = comp_match.group(1).strip()
+            remainder = text[start_match.end():]
+            if stop_pattern:
+                stop_re = re.compile(
+                    rf"(?:^|\n)\s*(?:[#>*-]\s*)?(?:\*\*)?(?:{stop_pattern})(?:\*\*)?\s*:?\s*",
+                    re.IGNORECASE,
+                )
+                stop_match = stop_re.search(remainder)
+                if stop_match:
+                    return remainder[: stop_match.start()].strip()
+            return remainder.strip()
 
-        # Fallback: use paragraphs
+        def _strip_markdown(text: str) -> str:
+            cleaned = text.strip()
+            cleaned = re.sub(r"^```[\w-]*\n", "", cleaned)
+            cleaned = re.sub(r"\n```$", "", cleaned)
+            cleaned = re.sub(r"^`{1,3}|`{1,3}$", "", cleaned)
+            cleaned = cleaned.replace("**", "")
+            cleaned = cleaned.strip()
+            return cleaned
+
+        raw = response.replace("\r\n", "\n").strip()
+
+        docstring = _extract_section(
+            raw,
+            labels=["Docstring", "Documentation", "Summary"],
+            stop_labels=["Example", "Usage", "Complexity", "Time Complexity", "Space Complexity"],
+        )
+        example = _extract_section(
+            raw,
+            labels=["Example", "Usage"],
+            stop_labels=["Complexity", "Time Complexity", "Space Complexity", "Notes"],
+        )
+        complexity = _extract_section(
+            raw,
+            labels=["Complexity", "Time Complexity", "Space Complexity"],
+            stop_labels=[],
+        )
+
         if not docstring:
-            paragraphs = [p.strip() for p in response.split("\n\n") if p.strip()]
+            paragraphs = [p.strip() for p in raw.split("\n\n") if p.strip()]
             if paragraphs:
                 docstring = paragraphs[0]
-            if len(paragraphs) > 1:
+            if len(paragraphs) > 1 and not complexity:
                 complexity = paragraphs[-1]
+
+        docstring = _strip_markdown(docstring)
+        example = _strip_markdown(example)
+        complexity = _strip_markdown(complexity)
+
+        if example.startswith("python\n") or example.startswith("javascript\n"):
+            example = example.split("\n", 1)[1].strip() if "\n" in example else ""
 
         return docstring, example, complexity
 

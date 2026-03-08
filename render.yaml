@@ -13,10 +13,20 @@ services:
         sync: false
       - key: QDRANT_PORT
         value: "6333"
+      - key: LLM_MODE
+        value: "groq_only"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: "gemini-1.5-flash-latest"
       - key: OPENROUTER_API_KEY
         sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: "llama-3.1-8b-instant"
       - key: OPENROUTER_MODEL
-        value: "anthropic/claude-3.5-sonnet"
+        value: "meta-llama/llama-3.1-8b-instruct:free"
       - key: OLLAMA_BASE_URL
         value: "http://localhost:11434"
       - key: OLLAMA_MODEL

@@ -51,12 +51,7 @@ async def propose_patch(
     patch_engine = get_patch_engine()
     orchestrator = get_orchestrator()
 
-    patch_prompt = patch_engine.create_patch_prompt(chunks, body.issue_description)
-    system = (
-        "You are a code repair expert. "
-        "Produce a minimal, correct unified diff that fixes the described issue. "
-        "Always include --- a/ and +++ b/ headers, and @@ hunk markers."
-    )
+    system, patch_prompt = patch_engine.create_patch_prompt(chunks, body.issue_description)
 
     try:
         llm_output = await orchestrator.generate(
