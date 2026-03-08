@@ -208,6 +208,57 @@ class LLMOrchestrator:
             ]
             model_candidates = list(dict.fromkeys([m for m in model_candidates if m]))
 
+            if not self._config.gemini_api_key:
+                raise ValueError("GEMINI_API_KEY is not configured")
+
+            full_prompt = f"{system}\n\n{prompt}" if system else prompt
+            model = self._config.gemini_model
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{model}:generateContent"
+            )
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": full_prompt},
+                        ]
+                    }
+                ]
+            }
+
+            async with httpx.AsyncClient(timeout=90.0) as client:
+                response = await client.post(
+                    url,
+                    params={"key": self._config.gemini_api_key},
+                    json=payload,
+                )
+                response.raise_for_status()
+                data = response.json()
+                candidates = data.get("candidates", [])
+                if not candidates:
+                    return ""
+                parts = candidates[0].get("content", {}).get("parts", [])
+                return "".join(part.get("text", "") for part in parts)
+        except Exception as exc:
+            logger.error("Gemini call failed: %s", exc)
+            return f"Error: LLM unavailable ({exc})"
+
+    async def _call_openrouter(self, prompt: str, system: str) -> str:
+        """Call OpenRouter API with model fallback and detailed error surfacing."""
+        try:
+            if not self._config.openrouter_api_key:
+                raise ValueError("OPENROUTER_API_KEY is not configured")
+
+            configured_model = self._config.openrouter_model.strip()
+            model_candidates = [
+                configured_model,
+                "meta-llama/llama-3.1-8b-instruct:free",
+                "mistralai/mistral-7b-instruct:free",
+                "google/gemma-2-9b-it:free",
+            ]
+            model_candidates = list(dict.fromkeys([m for m in model_candidates if m]))
+
             url = "https://openrouter.ai/api/v1/chat/completions"
             messages = []
             if system:

@@ -1,5 +1,4 @@
 import logging
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,15 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database tables on startup, with graceful fallback."""
-    settings = get_settings()
-    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
-    logger.info("CORS allowed origins: %s", origins)
     try:
         from app.database import Base, get_engine
         engine = get_engine()
@@ -36,17 +31,22 @@ app = FastAPI(
 )
 
 settings = get_settings()
-origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
-if not origins:
+# Parse cors_origins env var (comma-separated). Allow a blank/None -> treat as '*'.
+_raw = (settings.cors_origins or "").strip()
+if not _raw:
     origins = ["*"]
-allow_all_origins = origins == ["*"]
+else:
+    origins = [o.strip() for o in _raw.split(",") if o.strip()]
+    if not origins:
+        origins = ["*"]
 
-logger.info("CORS allowed origins: %s", origins)
+allow_all_origins = origins == ["*"]
+logger.info("CORS allowed origins: %s (allow_all=%s)", origins, allow_all_origins)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=not allow_all_origins,
+    allow_origins=origins if not allow_all_origins else ["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],

@@ -1,10 +1,11 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Repo
+from app.models import Chunk, File, Repo
 from app.schemas import RepoConnect, RepoResponse
 
 logger = logging.getLogger(__name__)
