@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listRepos, query, getErrorMessage, type Repo, type QueryResult } from '../api/client'
+import { listRepos, query, type Repo, type QueryResult } from '../api/client'
 import CodeBlock from '../components/CodeBlock'
 
 export default function QueryPage() {
@@ -14,7 +14,7 @@ export default function QueryPage() {
 
   const loadRepos = () => {
     setRepoLoadError('')
-    listRepos().then(setRepos).catch((e) => setRepoLoadError(getErrorMessage(e)))
+    listRepos().then(setRepos).catch((e: any) => setRepoLoadError(e?.userMessage || 'Failed to load repositories'))
   }
 
   useEffect(() => { loadRepos() }, [])
@@ -28,7 +28,7 @@ export default function QueryPage() {
       const res = await query({ repo_id: repoId, question, top_k: 8 })
       setResult(res)
     } catch (e) {
-      setError(getErrorMessage(e))
+      setError((e as any)?.userMessage || 'An unexpected error occurred')
     } finally {
       setLoading(false)
     }

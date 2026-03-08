@@ -209,14 +209,81 @@ class LLMOrchestrator:
             ]
             model_candidates = list(dict.fromkeys([m for m in model_candidates if m]))
 
-            url = "https://openrouter.ai/api/v1/chat/completions"
+            full_prompt = f"{system}\n\n{prompt}" if system else prompt
+            configured = self._config.gemini_model.strip()
+            candidates = [
+                configured,
+                "gemini-1.5-flash-latest",
+                "gemini-2.0-flash",
+            ]
+            model_candidates = list(dict.fromkeys([m for m in candidates if m]))
+
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": full_prompt},
+                        ]
+                    }
+                ]
+            }
+
+            async with httpx.AsyncClient(timeout=90.0) as client:
+                last_exc: Exception | None = None
+                for model in model_candidates:
+                    url = (
+                        "https://generativelanguage.googleapis.com/v1beta/models/"
+                        f"{model}:generateContent"
+                    )
+                    try:
+                        response = await client.post(
+                            url,
+                            params={"key": self._config.gemini_api_key},
+                            json=payload,
+                        )
+                        response.raise_for_status()
+                        data = response.json()
+                        response_candidates = data.get("candidates", [])
+                        if not response_candidates:
+                            return ""
+                        parts = response_candidates[0].get("content", {}).get("parts", [])
+                        return "".join(part.get("text", "") for part in parts)
+                    except httpx.HTTPStatusError as exc:
+                        last_exc = exc
+                        if exc.response.status_code == 404:
+                            logger.warning("Gemini model not found: %s", model)
+                            continue
+                        raise
+                if last_exc is not None:
+                    raise last_exc
+                raise ValueError("No Gemini model candidates configured")
+        except Exception as exc:
+            logger.error("Gemini call failed: %s", exc)
+            return f"Error: LLM unavailable ({exc})"
+
+    async def _call_groq(self, prompt: str, system: str) -> str:
+        """Call Groq API with model fallback."""
+        try:
+            if not self._config.groq_api_key:
+                raise ValueError("GROQ_API_KEY is not configured")
+
+            configured_model = self._config.groq_model.strip()
+            model_candidates = [
+                configured_model,
+                "llama-3.1-8b-instant",
+                "gemma2-9b-it",
+                "llama-3.3-70b-versatile",
+            ]
+            model_candidates = list(dict.fromkeys([m for m in model_candidates if m]))
+
+            url = "https://api.groq.com/openai/v1/chat/completions"
             messages = []
             if system:
                 messages.append({"role": "system", "content": system})
             messages.append({"role": "user", "content": prompt})
 
             headers = {
-                "Authorization": f"Bearer {self._config.openrouter_api_key}",
+                "Authorization": f"Bearer {self._config.groq_api_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://codepilot.local",
                 "X-Title": "CodePilot",
