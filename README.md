@@ -106,3 +106,10 @@ npm run dev
 
 The Vite dev server proxies `/api/*` to `http://localhost:8000` automatically (see `vite.config.ts`).
 
+
+
+### Architecture Notes (implemented)
+
+- Centralized prompt templates via backend `PromptManager` (query/diagnose/patch/docs) to keep prompts consistent and easier to evolve.
+- Sandbox verification confidence now uses weighted components (`test_pass_fraction`, `lint_score`, `model_confidence`, `sandbox_stability`, `diff_size_penalty`) with explicit evidence returned by the verifier.
+

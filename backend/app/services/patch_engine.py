@@ -1,6 +1,7 @@
 import logging
 import re
 
+from app.services.prompt_manager import get_prompt_manager
 from app.utils.diff_utils import (
     extract_target_file,
     parse_unified_diff,
@@ -59,8 +60,8 @@ class PatchEngine:
 
     def create_patch_prompt(
         self, chunks: list[dict], issue_description: str
-    ) -> str:
-        """Build a prompt requesting a unified diff for the described issue."""
+    ) -> tuple[str, str]:
+        """Build system/user prompts for patch generation."""
         snippets: list[str] = []
         for chunk in chunks:
             lang = chunk.get("language", "")
@@ -68,21 +69,13 @@ class PatchEngine:
             sl = chunk.get("start_line", 0)
             el = chunk.get("end_line", 0)
             text = chunk.get("text", "")
-            snippets.append(
-                f"[File: {fp} L{sl}-{el}]\n```{lang}\n{text}\n```"
-            )
+            snippets.append(f"[File: {fp} L{sl}-{el}]\n```{lang}\n{text}\n```")
 
         context = "\n\n".join(snippets)
-        return (
-            f"You are a code repair assistant.\n\n"
-            f"Issue:\n{issue_description}\n\n"
-            f"Relevant code:\n\n{context}\n\n"
-            f"Produce a minimal unified diff (--- a/... +++ b/... @@ ... @@) "
-            f"that fixes the issue. Include:\n"
-            f"1. The unified diff block.\n"
-            f"2. A brief explanation of the change.\n"
-            f"3. A Python unit test for the fix inside a ```python``` block.\n"
-            f"Output only the diff, explanation, and test — no other text."
+        return get_prompt_manager().render(
+            "patch",
+            issue_description=issue_description,
+            context=context,
         )
 
     # ------------------------------------------------------------------

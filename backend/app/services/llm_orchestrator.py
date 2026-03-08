@@ -4,6 +4,7 @@ import httpx
 
 from app.config import Settings, get_settings
 from app.services.cache import get_cache
+from app.services.prompt_manager import get_prompt_manager
 from app.services.secrets_scanner import get_secrets_scanner
 
 logger = logging.getLogger(__name__)
@@ -208,15 +209,15 @@ class LLMOrchestrator:
             ]
             model_candidates = list(dict.fromkeys([m for m in model_candidates if m]))
 
-            if not self._config.gemini_api_key:
-                raise ValueError("GEMINI_API_KEY is not configured")
-
             full_prompt = f"{system}\n\n{prompt}" if system else prompt
-            model = self._config.gemini_model
-            url = (
-                "https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{model}:generateContent"
-            )
+            configured = self._config.gemini_model.strip()
+            candidates = [
+                configured,
+                "gemini-1.5-flash-latest",
+                "gemini-2.0-flash",
+            ]
+            model_candidates = list(dict.fromkeys([m for m in candidates if m]))
+
             payload = {
                 "contents": [
                     {
@@ -228,45 +229,61 @@ class LLMOrchestrator:
             }
 
             async with httpx.AsyncClient(timeout=90.0) as client:
-                response = await client.post(
-                    url,
-                    params={"key": self._config.gemini_api_key},
-                    json=payload,
-                )
-                response.raise_for_status()
-                data = response.json()
-                candidates = data.get("candidates", [])
-                if not candidates:
-                    return ""
-                parts = candidates[0].get("content", {}).get("parts", [])
-                return "".join(part.get("text", "") for part in parts)
+                last_exc: Exception | None = None
+                for model in model_candidates:
+                    url = (
+                        "https://generativelanguage.googleapis.com/v1beta/models/"
+                        f"{model}:generateContent"
+                    )
+                    try:
+                        response = await client.post(
+                            url,
+                            params={"key": self._config.gemini_api_key},
+                            json=payload,
+                        )
+                        response.raise_for_status()
+                        data = response.json()
+                        response_candidates = data.get("candidates", [])
+                        if not response_candidates:
+                            return ""
+                        parts = response_candidates[0].get("content", {}).get("parts", [])
+                        return "".join(part.get("text", "") for part in parts)
+                    except httpx.HTTPStatusError as exc:
+                        last_exc = exc
+                        if exc.response.status_code == 404:
+                            logger.warning("Gemini model not found: %s", model)
+                            continue
+                        raise
+                if last_exc is not None:
+                    raise last_exc
+                raise ValueError("No Gemini model candidates configured")
         except Exception as exc:
             logger.error("Gemini call failed: %s", exc)
             return f"Error: LLM unavailable ({exc})"
 
-    async def _call_openrouter(self, prompt: str, system: str) -> str:
-        """Call OpenRouter API with model fallback and detailed error surfacing."""
+    async def _call_groq(self, prompt: str, system: str) -> str:
+        """Call Groq API with model fallback."""
         try:
-            if not self._config.openrouter_api_key:
-                raise ValueError("OPENROUTER_API_KEY is not configured")
+            if not self._config.groq_api_key:
+                raise ValueError("GROQ_API_KEY is not configured")
 
-            configured_model = self._config.openrouter_model.strip()
+            configured_model = self._config.groq_model.strip()
             model_candidates = [
                 configured_model,
-                "meta-llama/llama-3.1-8b-instruct:free",
-                "mistralai/mistral-7b-instruct:free",
-                "google/gemma-2-9b-it:free",
+                "llama-3.1-8b-instant",
+                "gemma2-9b-it",
+                "llama-3.3-70b-versatile",
             ]
             model_candidates = list(dict.fromkeys([m for m in model_candidates if m]))
 
-            url = "https://openrouter.ai/api/v1/chat/completions"
+            url = "https://api.groq.com/openai/v1/chat/completions"
             messages = []
             if system:
                 messages.append({"role": "system", "content": system})
             messages.append({"role": "user", "content": prompt})
 
             headers = {
-                "Authorization": f"Bearer {self._config.openrouter_api_key}",
+                "Authorization": f"Bearer {self._config.groq_api_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://codepilot.local",
                 "X-Title": "CodePilot",
@@ -333,12 +350,6 @@ class LLMOrchestrator:
 
         Returns (system_prompt, user_prompt).
         """
-        system = (
-            "You are CodePilot, an AI code assistant. "
-            "Answer questions about code accurately and concisely. "
-            "Always cite file paths and line numbers."
-        )
-
         snippets: list[str] = []
         for chunk in chunks:
             lang = chunk.get("language", "")
@@ -350,7 +361,13 @@ class LLMOrchestrator:
             snippets.append(f"{header}\n```{lang}\n{text}\n```")
 
         context = "\n\n".join(snippets)
-        user_prompt = f"Context:\n\n{context}\n\n---\n\n{question}"
+        template_key = "diagnose" if task == "diagnose" else "query"
+        system, user_prompt = get_prompt_manager().render(
+            template_key,
+            context=context,
+            question=question,
+            error_text=question,
+        )
         return system, user_prompt
 
 
